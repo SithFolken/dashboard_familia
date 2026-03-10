@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-from data_access import get_disponibilidad
+from data_access import get_disponibilidad,get_nivel_servicio
+
 
 #falta agregar
     #distribucion de inventario por subfamilia.
@@ -28,6 +31,131 @@ col1.metric("Disponibilidad promedio", round(disponibilidad,2))
 col2.metric("% Riesgo quiebre", round(riesgo,2))
 col3.metric("% Forecast incorrecto", round(fcst_error,2))
 col4.metric("Cobertura semanas", round(cobertura,2))
+
+st.divider()
+
+
+# ---------------- DISPONIBILIDAD SEMANAL ----------------
+dfN1 = get_nivel_servicio(1,417)
+dfNI = get_nivel_servicio(2,417)
+dfNN = get_nivel_servicio(3,417)
+
+col1 , col2, col3 = st.columns(3)
+
+with col1:
+
+    st.subheader("Disponibilidad Total por Semana")
+
+    sns.set_style("whitegrid")
+
+    fig, ax = plt.subplots(figsize=(6,3))
+
+    sns.lineplot(data=dfN1, x="semana", y="porcIyII", label="NS 1 y 2", ax=ax)
+    sns.lineplot(data=dfN1, x="semana", y="porcTotal", label="NS Total", ax=ax)
+
+    # obtener año actual
+    anio_actual = dfN1["ano"].max()
+
+    df_actual = dfN1[dfN1["ano"] == anio_actual]
+
+    # obtener última semana
+    ultima_fila = df_actual.loc[df_actual["semana"].idxmax()]
+
+    # mostrar solo ese valor
+    ax.text(
+        ultima_fila["semana"],
+        ultima_fila["porcIyII"],
+        f'{ultima_fila["porcIyII"]*100:.1f}%',
+        fontsize=9
+    )
+
+    ax.text(
+        ultima_fila["semana"],
+        ultima_fila["porcTotal"],
+        f'{ultima_fila["porcTotal"]*100:.1f}%',
+        fontsize=9
+    )
+
+    ax.set_ylim(0.85,1)
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+with col2:
+    st.subheader("Disponibilidad Importado")
+
+    sns.set_style("whitegrid")
+
+    fig, ax = plt.subplots(figsize=(6,3))
+
+    sns.lineplot(data=dfNI, x="semana", y="porcIyII", label="NS 1 y 2", ax=ax)
+    sns.lineplot(data=dfNI, x="semana", y="porcTotal", label="NS Total", ax=ax)
+
+    # obtener año actual
+    anio_actual = dfNI["ano"].max()
+
+    df_actual = dfNI[dfNI["ano"] == anio_actual]
+
+    # obtener última semana
+    ultima_fila = df_actual.loc[df_actual["semana"].idxmax()]
+
+    # mostrar solo ese valor
+    ax.text(
+        ultima_fila["semana"],
+        ultima_fila["porcIyII"],
+        f'{ultima_fila["porcIyII"]*100:.1f}%',
+        fontsize=9
+    )
+
+    ax.text(
+        ultima_fila["semana"],
+        ultima_fila["porcTotal"],
+        f'{ultima_fila["porcTotal"]*100:.1f}%',
+        fontsize=9
+    )
+
+    ax.set_ylim(0.85,1)
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+with col3:
+    st.subheader("Disponibilidad Nacional")
+
+    sns.set_style("whitegrid")
+
+    fig, ax = plt.subplots(figsize=(6,3))
+
+    sns.lineplot(data=dfNN, x="semana", y="porcIyII", label="NS 1 y 2", ax=ax)
+    sns.lineplot(data=dfNN, x="semana", y="porcTotal", label="NS Total", ax=ax)
+
+    # obtener año actual
+    anio_actual = dfNN["ano"].max()
+
+    df_actual = dfNN[dfNN["ano"] == anio_actual]
+
+    # obtener última semana
+    ultima_fila = df_actual.loc[df_actual["semana"].idxmax()]
+
+    # mostrar solo ese valor
+    ax.text(
+        ultima_fila["semana"],
+        ultima_fila["porcIyII"],
+        f'{ultima_fila["porcIyII"]*100:.1f}%',
+        fontsize=9
+    )
+
+    ax.text(
+        ultima_fila["semana"],
+        ultima_fila["porcTotal"],
+        f'{ultima_fila["porcTotal"]*100:.1f}%',
+        fontsize=9
+    )
+
+    ax.set_ylim(0.85,1)
+    ax.grid(True)
+
+    st.pyplot(fig)
 
 st.divider()
 

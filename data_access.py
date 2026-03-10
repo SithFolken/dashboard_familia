@@ -39,3 +39,20 @@ def get_disponibilidad() :
     conn.close()
 
     return df
+
+def get_nivel_servicio(O,FAM) :
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """CALL Analisis_Procesos.sp_consultas_revision_familias_app(%s, %s)"""
+    cursor.execute(query, (O, FAM))
+
+    rows = cursor.fetchall()
+    columns = [col[0] for col in cursor.description]
+
+    df = pd.DataFrame(rows, columns=columns)
+
+    cursor.close()
+    conn.close()
+
+    return df
