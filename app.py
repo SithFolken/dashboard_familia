@@ -86,9 +86,9 @@ st.divider()
 
 
 # ---------------- DISPONIBILIDAD SEMANAL ----------------
-dfN1 = get_nivel_servicio(1,417)
-dfNI = get_nivel_servicio(2,417)
-dfNN = get_nivel_servicio(3,417)
+dfN1 = get_nivel_servicio(1,427)
+dfNI = get_nivel_servicio(2,427)
+dfNN = get_nivel_servicio(3,427)
 
 col1 , col2, col3 = st.columns(3)
 
@@ -119,18 +119,57 @@ with col1:
 
     st.subheader("Estado Forecast")
 
-    estado_fcst = df["estado_fcst"].value_counts()
+    estado_fcst = df["estado_fcst"].value_counts().reset_index()
+    estado_fcst.columns = ["estado_fcst", "cantidad"]
 
-    st.bar_chart(estado_fcst)
+    colores = {
+    "FCST OK": "green",
+    "FCST ALTO": "orange",
+    "FCST BAJO": "red"
+    }
+
+    fig = px.bar(
+    estado_fcst,
+    x="estado_fcst",
+    y="cantidad",
+    color="estado_fcst",
+    color_discrete_map=colores,
+    title="Estado Forecast"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 with col2:
 
-    st.subheader("Disponibilidad promedio por tienda")
+    st.subheader("Disponibilidad promedio SDS por tienda")
 
-    disp_tienda = df.groupby("id_tienda")["disponibilidad_fcst"].mean()
+    # Agrupar SDS promedio por tienda
+    disp_tienda = (
+        df.groupby("id_tienda")["disponibilidad_fcst"]
+        .mean()
+        .reset_index()
+    )
 
-    st.bar_chart(disp_tienda)
+    # ordenar
+    disp_tienda = disp_tienda.sort_values("disponibilidad_fcst")
 
+    # convertir a texto para evitar espacios
+    disp_tienda["id_tienda"] = disp_tienda["id_tienda"].astype(str)
+
+    # gráfico
+    fig = px.bar(
+        disp_tienda,
+        y="id_tienda",
+        x="disponibilidad_fcst",
+        orientation="h",
+        text_auto=True,
+        title="Disponibilidad promedio SDS por tienda"
+    )
+
+    # eje categórico (esto elimina los espacios)
+    fig.update_yaxes(type="category")
+
+    st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
