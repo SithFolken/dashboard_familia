@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from data_access import get_disponibilidad, get_nivel_servicio
+from data_access import get_disponibilidad, get_nivel_servicio, get_nivel_inventario
 from charts import grafico_disponibilidad
 
 
@@ -15,7 +15,7 @@ st.set_page_config(
 # TÍTULO
 st.title("Disponibilidad - Familia Muebles y Organización")
 
-# CArgar Datos
+# Cargar Datos
 
 @st.cache_data
 def cargar_datos():
@@ -23,6 +23,12 @@ def cargar_datos():
     return df
 
 df = cargar_datos()
+
+@st.cache_data
+def cargar_inventario():
+    return get_nivel_inventario()
+
+df_inv = cargar_inventario()
 
 # ---------------- CALCULO ERROR FORECAST ----------------
 
@@ -84,11 +90,95 @@ col4.metric(
 
 st.divider()
 
+familia = st.sidebar.number_input(
+    "Ingrese ID Familia",
+    min_value=1,
+    step=1
+)
 
 # ---------------- DISPONIBILIDAD SEMANAL ----------------
-dfN1 = get_nivel_servicio(1,427)
-dfNI = get_nivel_servicio(2,427)
-dfNN = get_nivel_servicio(3,427)
+def grafico_disponibilidad(df, titulo):
+
+    import datetime
+
+    semana_actual = datetime.date.today().isocalendar()[1]
+    anio_actual = datetime.date.today().year
+
+    # convertir formato largo
+    df_long = df.melt(
+        id_vars=["ano","semana"],
+        value_vars=["porcIyII","porcTotal"],
+        var_name="tipo",
+        value_name="disponibilidad"
+    )
+
+    df_long["tipo"] = df_long["tipo"].replace({
+        "porcIyII": "NS 1 y 2",
+        "porcTotal": "NS Total"
+    })
+
+    df_long["serie"] = df_long["ano"].astype(str) + " - " + df_long["tipo"]
+
+    fig = px.line(
+        df_long,
+        x="semana",
+        y="disponibilidad",
+        color="serie",
+        markers=True,
+        title=titulo
+    )
+
+    # línea meta
+    fig.add_hline(
+        y=0.95,
+        line_dash="dash",
+        line_color="red",
+        annotation_text="Meta 95%"
+    )
+
+    # línea semana actual
+    fig.add_vline(
+        x=semana_actual,
+        line_dash="dot",
+        line_color="yellow"
+    )
+
+    # buscar datos semana actual año actual
+    df_semana = df_long[
+        (df_long["semana"] == semana_actual) &
+        (df_long["ano"] == anio_actual)
+    ]
+
+    # agregar etiqueta
+    if not df_semana.empty:
+        for _, row in df_semana.iterrows():
+
+            fig.add_annotation(
+                x=row["semana"],
+                y=row["disponibilidad"],
+                text=f"{row['disponibilidad']:.1%}",
+                showarrow=True,
+                arrowhead=2,
+                bgcolor="white"
+            )
+
+    # mover leyenda abajo horizontal
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.30,
+            xanchor="center",
+            x=0.5
+        )
+    )
+
+    return fig
+
+
+dfN1 = get_nivel_servicio(1,familia)
+dfNI = get_nivel_servicio(2,familia)
+dfNN = get_nivel_servicio(3,familia)
 
 col1 , col2, col3 = st.columns(3)
 
@@ -323,3 +413,111 @@ with col6:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+
+# ---------------- ANALISIS INVENTARIO----------------
+
+df_inv["posicion_inventario"] = (
+    df_inv["stock_total"]
+    + df_inv["disp_bod"]
+    + df_inv["pend_bod"]
+)
+
+df_inv["demanda_7w"] = (
+    df_inv["fcst_sem1"] +
+    df_inv["fcst_sem2"] +
+    df_inv["fcst_sem3"] +
+    df_inv["fcst_sem4"] +
+    df_inv["fcst_sem5"] +
+    df_inv["fcst_sem6"] +
+    df_inv["fcst_sem7"]
+)
+
+df_inv["inventario_post_7w"] = (
+    df_inv["posicion_inventario"]
+    + df_inv["inv_proy_sem1"]
+    + df_inv["inv_proy_sem2"]
+    + df_inv["inv_proy_sem3"]
+    + df_inv["inv_proy_sem4"]
+    + df_inv["inv_proy_sem5"]
+    + df_inv["inv_proy_sem6"]
+    + df_inv["inv_proy_sem7"]
+    - df_inv["demanda_7w"]
+)
+
+df_inv["compras_7w"] = (
+    df_inv["inv_proy_sem1"] +
+    df_inv["inv_proy_sem2"] +
+    df_inv["inv_proy_sem3"] +
+    df_inv["inv_proy_sem4"] +
+    df_inv["inv_proy_sem5"] +
+    df_inv["inv_proy_sem6"] +
+    df_inv["inv_proy_sem7"]
+)
+
+st.subheader("Inventario proyectado después de 7 semanas")
+
+fig = px.histogram(
+    df_inv,
+    x="inventario_post_7w",
+    nbins=40,
+    title="Distribución inventario proyectado"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+fig = px.scatter(
+    df_inv.sample(min(len(df_inv),3000)),
+    x="demanda_7w",
+    y="compras_7w",
+    size="stock_total",
+    hover_data=[
+        "sku",
+        "descripcion_producto",
+        "stock_total",
+        "disp_bod",
+        "pend_bod"
+    ],
+    title="Compras vs Demanda futura (tamaño = inventario)"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+
+quiebre = df_inv[df_inv["inventario_post_7w"] < 0]
+
+st.subheader("SKU con quiebre proyectado")
+
+st.dataframe(
+    quiebre.sort_values("inventario_post_7w").head(20)[[
+        "sku",
+        "descripcion_producto",
+        "stock_total",
+        "disp_bod",
+        "pend_bod",
+        "inventario_post_7w"
+    ]],
+    use_container_width=True
+)
+
+riesgo = df_inv.sort_values("inventario_post_7w").head(15)
+
+riesgo["sku"] = riesgo["sku"].astype(str)
+
+fig = px.bar(
+    riesgo,
+    x="inventario_post_7w",
+    y="sku",
+    orientation="h",
+    color="inventario_post_7w",
+    hover_data=["descripcion_producto"],
+    title="Top SKU con mayor riesgo de quiebre"
+)
+
+fig.update_layout(
+    yaxis={'categoryorder':'total ascending'}
+)
+
+st.plotly_chart(fig, use_container_width=True)
